@@ -85,17 +85,34 @@ end top_basys3;
 
 architecture top_basys3_arch of top_basys3 is 
   
-	-- declare components
+  component thunderbird_fsm is 
+    port(
+    i_clk, i_reset  : in    std_logic;
+    i_left, i_right : in    std_logic;
+    o_lights_L      : out   std_logic_vector(2 downto 0);
+    o_lights_R      : out   std_logic_vector(2 downto 0)	
+    );
+    end component;
 
   
 begin
 	-- PORT MAPS ----------------------------------------
-
+  thunderbird_fsm_inst : thunderbird_fsm
+  port map(
+    i_clk      => clk,
+    i_reset    => btnL,
+    i_reset    => btnR, --what's the difference? between the 2 reset buttons
+    i_left     => sw(15),
+    i_right    => sw(0),
+    o_lights_L => led(15 downto 13),
+    o_lights_R => led(2 downto 0)
+  );
 	
 	
 	-- CONCURRENT STATEMENTS ----------------------------
 	
 	-- ground unused LEDs
+	--led(12 downto 3) <= "0000000000";
 	-- leave unused switches UNCONNECTED
 	
 	-- Ignore the warnings associated with these signals

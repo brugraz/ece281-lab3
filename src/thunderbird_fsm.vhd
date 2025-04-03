@@ -40,14 +40,14 @@
 --|                 --------------------
 --|                  State | Encoding
 --|                 --------------------
---|                  OFF   | 
---|                  ON    | 
---|                  R1    | 
---|                  R2    | 
---|                  R3    | 
---|                  L1    | 
---|                  L2    | 
---|                  L3    | 
+--|                  OFF   | 10000000
+--|                  ON    | 01111111
+--|                  R1    | 00000001
+--|                  R2    | 00000011
+--|                  R3    | 00000111
+--|                  L1    | 00001000
+--|                  L2    | 00011000
+--|                  L3    | 00111000
 --|                 --------------------
 --|
 --|
@@ -86,23 +86,67 @@ library ieee;
   use ieee.numeric_std.all;
  
 entity thunderbird_fsm is 
---  port(
-	
---  );
+  port(
+  i_clk, i_reset  : in    std_logic;
+  i_left, i_right : in    std_logic;
+  o_lights_L      : out   std_logic_vector(2 downto 0);
+  o_lights_R      : out   std_logic_vector(2 downto 0)	
+  );
 end thunderbird_fsm;
 
 architecture thunderbird_fsm_arch of thunderbird_fsm is 
+
+signal f_Q      : std_logic_vector(7 downto 0) := "10000000";
+signal f_Q_next : std_logic_vector(7 downto 0) := "10000000";
+--signal i_lr     : std_logic_vector(1 downto 0) := "00";
 
 -- CONSTANTS ------------------------------------------------------------------
   
 begin
 
-	-- CONCURRENT STATEMENTS --------------------------------------------------------	
+	-- CONCURRENT STATEMENTS --------------------------------------------------------		
+	-- next state :  
+  f_Q_next(7) <= (f_Q(7) and not i_left and not i_right) -- off ~l~r -> off (stay off)
+	            or  f_Q(6)                                 -- on       -> off (haz blink off)
+              or  f_Q(2)          -- r3 -> off (r end)
+	            or  f_Q(5);         -- l3 -> off (l end)
+	
+  f_Q_next(0) <= f_Q(7) and not i_left and     i_right; -- off ~l r -> r1  (r start)
+	f_Q_next(3) <= f_Q(7) and     i_left and not i_right; -- off  l~r -> l1  (l start)
+  f_Q_next(6) <= f_Q(7) and     i_left and     i_right; -- off  l r -> on  (haz blink on)
+	f_Q_next(1) <= f_Q(0); -- r1 -> r2  (r adv)
+	f_Q_next(2) <= f_Q(1); -- r2 -> r3  (r adv) 
+	f_Q_next(4) <= f_Q(3); -- l1 -> l2  (l adv)
+	f_Q_next(5) <= f_Q(4); -- l2 -> l3  (l adv)
+	
+	-- outputs
+	with f_Q select
+	o_lights_R <= "000" when "10000000", -- turn all lights off if OFF
+	              "111" when "01000000", -- turn all lights on if ON
+                "001" when "00000001", -- r1
+	              "011" when "00000010", -- r2 
+	              "111" when "00000100", -- r3
+	              "000" when others;     -- like while right sig is happening
+	
+	with f_Q select
+	o_lights_L <= "000" when "10000000", -- OFF
+	              "111" when "01000000", -- ON
+	              "001" when "00001000", -- l1
+	              "011" when "00010000", -- l2
+	              "111" when "00100000", -- l3
+	              "000" when others;     -- like while left sig is happening
 	
     ---------------------------------------------------------------------------------
 	
 	-- PROCESSES --------------------------------------------------------------------
-    
+  register_proc : process (i_clk, i_reset)
+	begin
+    if i_reset = '1' then
+       f_Q <= "10000000";  -- reset state is yellow
+    elsif (rising_edge(i_clk)) then
+       f_Q <= f_Q_next;    -- next state becomes current state
+    end if;
+  end process register_proc;
 	-----------------------------------------------------					   
 				  
 end thunderbird_fsm_arch;
